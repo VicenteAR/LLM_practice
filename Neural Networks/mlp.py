@@ -49,11 +49,11 @@ class BatchNorm1D:
 
     def __call__(self, hpreact=torch.Tensor):
         "Perform Batch Normalization operation over a Linear Layer income."
-        # Mean and standard deviation
+        # Mean and variance
         if self.train == True:
             mean = hpreact.mean(dim=0, keepdim=True)
             var = hpreact.var(dim=0, keepdim=True)
-            # Running momentum update
+            # During training, update running mean and variance
             with torch.no_grad():
                 self.bnmean_running = (
                     1.0 - self.momentum
@@ -61,13 +61,13 @@ class BatchNorm1D:
                 self.bnvar_running = (
                     1.0 - self.momentum
                 ) * self.bnvar_running + self.momentum * var
-            return (hpreact - mean) / torch.sqrt(
-                var + self.eps
-            ) * self.bngain + self.bnbias
         else:
-            return (hpreact - self.bnmean_running) / torch.sqrt(
-                self.bnvar_running + self.eps
-            ) * self.bngain + self.bnbias
+            # No training. Use running mean and variance for inference
+            mean = self.bnmean_running
+            var = self.bnvar_running
+        # Compute output
+        out = (hpreact - mean) / torch.sqrt(var + self.eps) * self.bngain + self.bnbias
+        return out
 
     def parameters(self):
         return [self.bngain, self.bnbias]
