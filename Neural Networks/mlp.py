@@ -3,7 +3,7 @@ import torch
 
 
 class Linear:
-    "Create a Linear layer"
+    """Create a Linear layer"""
 
     def __init__(
         self,
@@ -12,30 +12,30 @@ class Linear:
         generator: Optional[int],
         bias: bool = True,
     ):
-        "Initialization of the class."
+        """Initialization of the class."""
         self.g = torch.Generator().manual_seed(generator) if generator else None
-        self.weights = (
+        self.weight = (
             torch.randn(size=(fan_in, fan_out), generator=self.g) / fan_in**0.5
         )
         self.bias = torch.randn(fan_out, generator=self.g) if bias else None
 
     def __call__(self, x: torch.Tensor):
-        "Perform linear W @ x operation."
-        out = x @ self.weights
+        """Perform linear W @ x operation."""
+        out = x @ self.weight
         if self.bias is not None:
             out += self.bias
         return out
 
     def parameters(self):
-        "Return list of parameters (weights and bias if any)."
-        return [self.weights] if self.bias is None else [self.weights, self.bias]
+        """Return list of parameters (weights and bias if any)."""
+        return [self.weight] if self.bias is None else [self.weight, self.bias]
 
 
 class BatchNorm1D:
-    "Create a Batch Normalization layer. This class renormalizes the output of a Linear Layer class"
+    """Create a Batch Normalization layer. This class renormalizes the output of a Linear Layer class"""
 
     def __init__(self, num_features: int, eps: float = 1e-5, momentum: float = 0.1):
-        "Initialize the class."
+        """Initialize the class."""
         self.eps = eps
         self.momentum = momentum
         self.train = True
@@ -48,7 +48,7 @@ class BatchNorm1D:
             self.bnvar_running = torch.ones(num_features)
 
     def __call__(self, hpreact=torch.Tensor):
-        "Perform Batch Normalization operation over a Linear Layer income."
+        """Perform Batch Normalization operation over a Linear Layer income."""
         # Mean and variance
         if self.train == True:
             mean = hpreact.mean(dim=0, keepdim=True)
@@ -71,3 +71,18 @@ class BatchNorm1D:
 
     def parameters(self):
         return [self.bngain, self.bnbias]
+
+
+class Tanh:
+    """Create a non-linear (tanh) layer."""
+
+    def __init__(self):
+        """Initialize the class."""
+        pass
+
+    def __call__(self, x: torch.Tensor):
+        """Apply a non-linear (tanh) over a Linear class output."""
+        return torch.tanh(x)
+
+    def parameters(self):
+        return []
