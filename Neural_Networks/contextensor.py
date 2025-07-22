@@ -47,3 +47,32 @@ class ContextTorchTensor:
         X = torch.tensor(X)
         Y = torch.tensor(Y)
         return X, Y
+
+
+class TensorSplit:
+    """Split a set X,Y torch tensors into train/validation/test sets."""
+
+    def __init__(self, train_size: float, test_size: float):
+        """Initialize the class."""
+        assert isinstance(train_size, float)
+        assert isinstance(test_size, float)
+        self.train_size = train_size
+        self.test_size = train_size + test_size
+        assert self.train_size + self.test_size <= 1
+
+    def split(self, xs: torch.Tensor, ys: torch.Tensor) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
+        """Split the incoming xs, ys torch tensors into train/val/test sets."""
+        # Define dimensions train/test/validation splits
+        n1 = int(self.train_size * len(xs))
+        n2 = int(self.test_size * len(xs))
+        # Generate splits
+        xtrain, xval, xtest = torch.tensor_split(xs, (n1, n2), dim=0)
+        ytrain, yval, ytest = torch.tensor_split(ys, (n1, n2), dim=0)
+        return xtrain, xval, xtest, ytrain, yval, ytest
