@@ -21,10 +21,10 @@ class Linear:
 
     def __call__(self, x: torch.Tensor):
         """Perform linear W @ x operation."""
-        out = x @ self.weight
+        self.out = x @ self.weight
         if self.bias is not None:
-            out += self.bias
-        return out
+            self.out += self.bias
+        return self.out
 
     def parameters(self):
         """Return list of parameters (weights and bias if any)."""
@@ -66,8 +66,10 @@ class BatchNorm1D:
             mean = self.bnmean_running
             var = self.bnvar_running
         # Compute output
-        out = (hpreact - mean) / torch.sqrt(var + self.eps) * self.bngain + self.bnbias
-        return out
+        self.out = (hpreact - mean) / torch.sqrt(
+            var + self.eps
+        ) * self.bngain + self.bnbias
+        return self.out
 
     def parameters(self):
         return [self.bngain, self.bnbias]
@@ -82,7 +84,8 @@ class Tanh:
 
     def __call__(self, x: torch.Tensor):
         """Apply a non-linear (tanh) over a Linear class output."""
-        return torch.tanh(x)
+        self.out = torch.tanh(x)
+        return self.out
 
     def parameters(self):
         return []
