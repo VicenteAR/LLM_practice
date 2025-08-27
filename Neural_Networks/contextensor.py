@@ -15,7 +15,7 @@ class ContextTorchTensor:
 
     def __init__(self, context) -> None:
         self.context = context
-        self.vocab_size = None
+        self.vocab_size = 0
 
     def _generate_abc(self):
         self.abc = ["*"] + sorted(list(set("".join(self.words))))
@@ -58,7 +58,7 @@ class TensorSplit:
         assert isinstance(test_size, float)
         self.train_size = train_size
         self.test_size = train_size + test_size
-        assert self.train_size + self.test_size <= 1
+        assert train_size + test_size <= 1
 
     def split(self, xs: torch.Tensor, ys: torch.Tensor) -> tuple[
         torch.Tensor,
