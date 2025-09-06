@@ -40,8 +40,8 @@ class BatchNorm1D:
         self.momentum = momentum
         self.train = True
         # backpropagation parameters
-        self.bngain = torch.ones(num_features)
-        self.bnbias = torch.zeros(num_features)
+        self.bngain = torch.ones(num_features, requires_grad=True)
+        self.bnbias = torch.zeros(num_features, requires_grad=True)
         # buffers (trained with running momentum update)
         with torch.no_grad():
             self.bnmean_running = torch.zeros(num_features)
