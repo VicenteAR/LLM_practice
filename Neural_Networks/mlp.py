@@ -12,7 +12,7 @@ class Embedding:
         manual_seed: Optional[int] = None,
     ) -> None:
         """Initialization of the class."""
-        g = torch.Generator().manual_seed(g) if manual_seed else manual_seed
+        g = torch.Generator().manual_seed(manual_seed) if manual_seed else manual_seed
         self.weight = torch.randn(size=(vocab_size, embeding_dimension), generator=g)
 
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
