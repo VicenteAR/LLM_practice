@@ -195,6 +195,68 @@ class SingleHeadBiagramLanguageModel(nn.Module):
         return input
 
 
+class MultiHeadBiagramLanguageModel(nn.Module):
+    """Creates a LLM based on multi-head self-attention architechure."""
+
+    def __init__(self, vocab_size, context_size, emb_size, head_size, head_dim):
+        super().__init__()  # call the superclass to inherit its methods
+        self.context_size = context_size
+        # Creates embedding layers.
+        # Each token directly reads off the logits for the next token from a lookup table
+        self.token_emb_table = nn.Embedding(
+            num_embeddings=vocab_size, embedding_dim=emb_size
+        )
+        self.position_emb_table = nn.Embedding(
+            num_embeddings=context_size, embedding_dim=emb_size
+        )
+        # Creates multi-head self-attention block.
+        self.head = MultiHead(context_size, emb_size, head_size // head_dim, head_dim)
+        # Creates linear layer to produce logits
+        self.lm_nn = nn.Linear(in_features=head_size, out_features=vocab_size)
+
+    def forward(self, input, target=None):
+        """Iterates one step through the NN, creating the grad attribute."""
+        # Dimensions
+        B, T = input.shape
+        # Input embedding
+        tk_emb = self.token_emb_table(input)  # (B,T,C)
+        pos_emb = self.position_emb_table(torch.arange(T))  # (T,C)
+        x = tk_emb + pos_emb  # (B,T,C)
+        # Apply one-head of Self-attention
+        x = self.head(x)  # (B,T,H)
+        # Output of the NN
+        logits = self.lm_nn(x)  # This creates a (B,T,vocab size) tensor
+        # Compute the loss
+        if target == None:
+            loss = None
+        else:
+            # To compute the loss function using cross entropy, pytorch needs a
+            # B , C , T tensor
+            B, T, C = logits.shape
+            logits = logits.view(
+                B * T, C
+            )  # we generate a B*T, C tensor, where C = vocab size
+            target = target.view(B * T)
+            # Compute loss function
+            loss = F.cross_entropy(logits, target)
+        return logits, loss
+
+    def generate(self, input, num_iterations):
+        """Generate new tokens based on the given input."""
+        for _ in range(num_iterations):
+            # As we use a position embedding, we must crop the input
+            input_enc = input[:, -self.context_size :]
+            logits, loss = self(input_enc)
+            # We only need the last logit through T dimension
+            logits = logits[
+                :, -1, :
+            ]  # takes the last token. Creates a (B,C) tensor (C = vocab size)
+            probs = F.softmax(logits, dim=1)  # B, C
+            next_char = torch.multinomial(input=probs, num_samples=1)  # B, 1
+            input = torch.cat((input, next_char), dim=1)
+        return input
+
+
 class Head(nn.Module):
     """Creates a single head of self-attention."""
 
@@ -227,6 +289,21 @@ class Head(nn.Module):
         w = F.softmax(w, dim=2)  # (B,T,T)
         out = w @ v  # (B,T,T) @ (B,T,H) = (B,T,H)
         return out
+
+
+class MultiHead(nn.Module):
+    """Create a module based on multiple, concatenated Head modules."""
+
+    def __init__(self, context_size, emb_size, head_size, head_dim):
+        super().__init__()
+        # we create head_dim communication channels in paralel, each one of size head_size
+        self.head_list = nn.ModuleList(
+            [Head(context_size, emb_size, head_size) for _ in range(head_dim)]
+        )
+
+    def forward(self, input):
+        # Concatenate the output of the multiple head modules over the channel dimension.
+        return torch.cat([h(input) for h in self.head_list], dim=2)
 
 
 class EstimateLoss:

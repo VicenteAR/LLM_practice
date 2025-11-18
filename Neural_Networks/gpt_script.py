@@ -4,6 +4,7 @@ from gpt import (
     SetSplit,
     BiagramLanguageModel,
     SingleHeadBiagramLanguageModel,
+    MultiHeadBiagramLanguageModel,
     GetBatch,
     EstimateLoss,
 )
@@ -14,14 +15,15 @@ file = TrainingText(
 )
 # Parameters
 vocab_size = file.vocab_size
-context_size = 10
+context_size = 16
 batch_size = 16
 max_iters = 10000
 eval_interval = 300
 eval_iters = 200
 learning_rate = 1e-3
-head_size = 32
-emb_size = 32
+head_size = 64
+head_dim = 8
+emb_size = 64
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # Set seed
 torch.manual_seed(1337)
@@ -36,11 +38,12 @@ get_batch = GetBatch(batch_size=batch_size, context=context_size, device=device)
 estim_loss = EstimateLoss(train_data=train, val_data=val)
 # Selection of the model
 # model = BiagramLanguageModel(vocab_size=vocab_size)
-model = SingleHeadBiagramLanguageModel(
+model = MultiHeadBiagramLanguageModel(
     vocab_size=vocab_size,
     context_size=context_size,
     emb_size=emb_size,
     head_size=head_size,
+    head_dim=head_dim,
 )
 m = model.to(device)  # This generates a model whose call generates logits and losses
 optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
