@@ -1,5 +1,12 @@
 import torch
-from gpt import TrainingText, SetSplit, BiagramLanguageModel, GetBatch, EstimateLoss
+from gpt import (
+    TrainingText,
+    SetSplit,
+    BiagramLanguageModel,
+    SingleHeadBiagramLanguageModel,
+    GetBatch,
+    EstimateLoss,
+)
 
 # Get training text. Generate decoder/encoder and vocab paramenters
 file = TrainingText(
@@ -7,12 +14,14 @@ file = TrainingText(
 )
 # Parameters
 vocab_size = file.vocab_size
-context = 8
+context_size = 10
 batch_size = 16
 max_iters = 10000
 eval_interval = 300
 eval_iters = 200
 learning_rate = 1e-3
+head_size = 32
+emb_size = 32
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # Set seed
 torch.manual_seed(1337)
@@ -22,11 +31,17 @@ data = torch.tensor(file.encoder(file.text), dtype=torch.long)
 splitter = SetSplit(train_size=0.75, test_size=0.15)
 train, val, test = splitter.split(data=data)
 # Define the object to split the data into batches
-get_batch = GetBatch(batch_size=batch_size, context=context, device=device)
+get_batch = GetBatch(batch_size=batch_size, context=context_size, device=device)
 # Define the object to estimate the loss
 estim_loss = EstimateLoss(train_data=train, val_data=val)
-# Generate model
-model = BiagramLanguageModel(vocab_size=vocab_size)
+# Selection of the model
+# model = BiagramLanguageModel(vocab_size=vocab_size)
+model = SingleHeadBiagramLanguageModel(
+    vocab_size=vocab_size,
+    context_size=context_size,
+    emb_size=emb_size,
+    head_size=head_size,
+)
 m = model.to(device)  # This generates a model whose call generates logits and losses
 optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 # Training iteration
@@ -48,6 +63,6 @@ for i in range(max_iters):
 # Get a prediction
 predict = m.generate(
     input=torch.zeros((1, 1), dtype=torch.long, device=device),
-    num_iterations=100,
+    num_iterations=500,
 )
 print(file.decoder(predict[0].tolist()))

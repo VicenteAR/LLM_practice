@@ -131,6 +131,104 @@ class BiagramLanguageModel(nn.Module):
         return input
 
 
+class SingleHeadBiagramLanguageModel(nn.Module):
+    """Creates a LLM based on the Biagram NN with single-head architechure."""
+
+    def __init__(self, vocab_size, context_size, emb_size, head_size):
+        super().__init__()  # call the superclass to inherit its methods
+        self.context_size = context_size
+        # Creates embedding layers.
+        # Each token directly reads off the logits for the next token from a lookup table
+        self.token_emb_table = nn.Embedding(
+            num_embeddings=vocab_size, embedding_dim=emb_size
+        )
+        self.position_emb_table = nn.Embedding(
+            num_embeddings=context_size, embedding_dim=emb_size
+        )
+        # Creates single head of self-attention. Returns a tensor where past tokens are averaged.
+        self.head = Head(
+            context_size=context_size, emb_size=emb_size, head_size=head_size
+        )
+        # Creates linear layer to produce logits
+        self.lm_nn = nn.Linear(in_features=head_size, out_features=vocab_size)
+
+    def forward(self, input, target=None):
+        """Iterates one step through the NN, creating the grad attribute."""
+        # Dimensions
+        B, T = input.shape
+        # Input embedding
+        tk_emb = self.token_emb_table(input)  # (B,T,C)
+        pos_emb = self.position_emb_table(torch.arange(T))  # (T,C)
+        x = tk_emb + pos_emb  # (B,T,C)
+        # Apply one-head of Self-attention
+        x = self.head(x)  # (B,T,H)
+        # Output of the NN
+        logits = self.lm_nn(x)  # This creates a (B,T,vocab size) tensor
+        # Compute the loss
+        if target == None:
+            loss = None
+        else:
+            # To compute the loss function using cross entropy, pytorch needs a
+            # B , C , T tensor
+            B, T, C = logits.shape
+            logits = logits.view(
+                B * T, C
+            )  # we generate a B*T, C tensor, where C = vocab size
+            target = target.view(B * T)
+            # Compute loss function
+            loss = F.cross_entropy(logits, target)
+        return logits, loss
+
+    def generate(self, input, num_iterations):
+        """Generate new tokens based on the given input."""
+        for _ in range(num_iterations):
+            # As we use a position embedding, we must crop the input
+            input_enc = input[:, -self.context_size :]
+            logits, loss = self(input_enc)
+            # We only need the last logit through T dimension
+            logits = logits[
+                :, -1, :
+            ]  # takes the last token. Creates a (B,C) tensor (C = vocab size)
+            probs = F.softmax(logits, dim=1)  # B, C
+            next_char = torch.multinomial(input=probs, num_samples=1)  # B, 1
+            input = torch.cat((input, next_char), dim=1)
+        return input
+
+
+class Head(nn.Module):
+    """Creates a single head of self-attention."""
+
+    def __init__(self, context_size: int, emb_size: int, head_size: int):
+        super().__init__()  # call super methods
+        # attributes
+        self.head_size = head_size
+        self.query = nn.Linear(in_features=emb_size, out_features=head_size, bias=False)
+        self.key = nn.Linear(in_features=emb_size, out_features=head_size, bias=False)
+        self.value = nn.Linear(in_features=emb_size, out_features=head_size, bias=False)
+        self.register_buffer(
+            "tril", torch.tril(torch.ones((context_size, context_size)))
+        )
+
+    def forward(self, input):
+        """Iterates one step through the single head of self-attention."""
+        # Input dimensions
+        B, T, C = input.shape
+        # Output of the single head
+        q = self.query(input)  # (B,T,H)
+        k = self.key(input)  # (B,T,H)
+        v = self.value(input)  # (B,T,H)
+        w = q @ k.transpose(1, 2) * self.head_size**-0.5  # (B,T,H) @ (B,H,T) = (B,T,T)
+        w = w.masked_fill(
+            self.tril[:T, :T] == 0, float("-inf")
+        )  # (B,T,T) without speaking with the future
+        # Note: we crop self.tril to self.tril[:T, :T] because the input dimension T can vary from 1 to T.
+        # The original w dimensions are (b,t,t) where b, t are the actual input dimensions, not the ones given
+        # by the parameters.
+        w = F.softmax(w, dim=2)  # (B,T,T)
+        out = w @ v  # (B,T,T) @ (B,T,H) = (B,T,H)
+        return out
+
+
 class EstimateLoss:
     """Averages the model loss each eval iterations."""
 
