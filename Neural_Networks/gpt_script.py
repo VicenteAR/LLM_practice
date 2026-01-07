@@ -15,7 +15,7 @@ file = TrainingText(
 )
 # Parameters
 vocab_size = file.vocab_size
-context_size = 16
+context_size = 64
 batch_size = 16
 max_iters = 10000
 eval_interval = 300
@@ -24,6 +24,7 @@ learning_rate = 1e-3
 head_size = 64
 head_dim = 8
 emb_size = 64
+layer_size = 6
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # Set seed
 torch.manual_seed(1337)
@@ -44,6 +45,7 @@ model = MultiHeadBiagramLanguageModel(
     emb_size=emb_size,
     head_size=head_size,
     head_dim=head_dim,
+    layer_size=layer_size,
 )
 m = model.to(device)  # This generates a model whose call generates logits and losses
 optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
